@@ -1,4 +1,4 @@
-#ifndef PLANETS_H
+﻿#ifndef PLANETS_H
 #define PLANETS_H
 
 #include <glad/glad.h>
@@ -7,6 +7,7 @@
 #include <vector>
 #include <string>
 #include <Sphere.h>
+#include <iostream> // Include for logging
 
 struct PlanetData {
 	std::string name;
@@ -19,9 +20,18 @@ struct PlanetData {
 
 class Planet {
 private:
-	const float SCALE_FACTOR = 1e7f; // Scale factor to reduce planet sizes for visualization
+	const float SCALE_FACTOR = 5e7f;  // Even smaller planets
+	glm::dvec3 velocity = glm::dvec3(0.0);  // double precision vectors
+	glm::dvec3 position = glm::dvec3(0.0);
+
+	const double G = 6.67430e-11;
+	const double TIME_SCALE = 100000.0;  // Much faster - was 100.0
+
+	float lastUpdateTime = 0.0f;
+
 public:
 	std::vector<PlanetData> planets = {
+		// Name,Mass (kg),Radius (m),Distance from Sun (m), Orbital Period (years), Color (RGB)
 		{"Sun", 1.989e30f, 6.96e8f, 0.0f, 0.0f, glm::vec3(1.0f, 1.0f, 0.0f)},          
 		{"Mercury", 3.3011e23f, 2.4397e6f, 57.91e9f, 0.387f, glm::vec3(0.7f, 0.7f, 0.7f)}, 
 		{"Venus", 4.8675e24f, 6.0518e6f, 108.21e9f, 0.723f, glm::vec3(0.9f, 0.7f, 0.5f)}, 
@@ -55,6 +65,24 @@ public:
 				}
 				
 				planetSetup();
+
+				// Initialize position and velocity
+				if (data.name == "Sun") {
+					position = glm::dvec3(0.0);  // CHANGE: vec3 → dvec3
+					velocity = glm::dvec3(0.0);  // CHANGE: vec3 → dvec3
+				}
+				else {
+					// Start at orbital distance (convert to scaled units for rendering)
+					position = glm::dvec3(data.distanceFromSun / 1e10, 0.0, 0.0);  // CHANGE: vec3 → dvec3, remove 'f'
+			
+					// Calculate orbital velocity in real units: v = sqrt(GM/r)
+					double sunMass = 1.989e30;  // CHANGE: float → double, remove 'f'
+					double orbitalSpeed = glm::sqrt((G * sunMass) / data.distanceFromSun);  // CHANGE: float → double
+			
+					// Store velocity in scaled units (will be converted back in update)
+					velocity = glm::dvec3(0.0, 0.0, orbitalSpeed / 1e10);  // CHANGE: vec3 → dvec3, remove 'f'
+				}
+
 				return;
 			}
 		}
@@ -62,6 +90,7 @@ public:
 		data = planets[0];
 		sphere = Sphere(data.radius / SCALE_FACTOR, 36, 18, true);
 		planetSetup();
+
 	}
 
 	// Get planet data by index
@@ -120,11 +149,84 @@ public:
 	}
 
 	glm::vec3 getPosition() const {
-		return glm::vec3(data.distanceFromSun / 1e10f, 0.0f, 0.0f);
+		return glm::vec3(position);  // Convert dvec3 to vec3
+	}
+
+	glm::vec3 getGravitationalForce(const Planet& sun) const {
+		if (data.name == "Sun") return glm::vec3(0.0f);
+		
+		// Calculate distance vector (don't normalize yet!)
+		glm::vec3 toSun = sun.position - this->position;
+		float distance = glm::length(toSun);
+		
+		// Prevent division by zero
+		if (distance < 1.0f) return glm::vec3(0.0f);
+		
+		// Normalize direction
+		glm::vec3 direction = toSun / distance;
+		
+		// F = G * (m1 * m2) / r²
+		// Since our distances are scaled by 1e10, we need to account for this
+		float realDistance = distance * 1e10f;  // Convert back to meters for calculation
+		float forceMagnitude = (G * data.mass * sun.data.mass) / (realDistance * realDistance);
+		
+		// Scale force back down for our simulation
+		forceMagnitude /= 1e10f;
+		
+		return direction * forceMagnitude;
+	}
+
+	void update(float deltaTime, const Planet& sun) {
+		if (data.name == "Sun") return;
+
+		double dt = static_cast<double>(deltaTime) * TIME_SCALE;
+		
+		// Convert scaled position back to real position (meters)
+		glm::dvec3 realPosition = position * 1e10;
+		glm::dvec3 realSunPosition = sun.position * 1e10;
+		
+		// Calculate distance vector in meters
+		glm::dvec3 toSun = realSunPosition - realPosition;
+		double distance = glm::length(toSun);
+		
+		// DEBUG for Earth
+		if (data.name == "Earth" && distance < 1e6) {
+			std::cout << "ERROR: Distance too small: " << distance << std::endl;
+			return;
+		}
+		
+		if (distance < 1e6) return;
+		
+		// F = G * (m1 * m2) / r²
+		glm::dvec3 direction = glm::normalize(toSun);
+		double forceMagnitude = (G * static_cast<double>(data.mass) * static_cast<double>(sun.data.mass)) / (distance * distance);
+		glm::dvec3 force = direction * forceMagnitude;
+		
+		// a = F / m
+		glm::dvec3 acceleration = force / static_cast<double>(data.mass);
+		
+		// DEBUG for Earth
+		if (data.name == "Earth") {
+			std::cout << "Accel: " << acceleration.x << ", " << acceleration.y << ", " << acceleration.z << std::endl;
+		}
+	
+		// Convert velocity to real units (meters/second)
+		glm::dvec3 realVelocity = velocity * 1e10;
+	
+		// Update velocity and position in real units
+		realVelocity += acceleration * dt;
+		realPosition += realVelocity * dt;
+	
+		// Convert back to scaled units for rendering
+		velocity = realVelocity / 1e10;
+		position = realPosition / 1e10;
 	}
 
 	// Draw the planet
-	void draw(Shader& shader) {
+	void draw(Shader& shader, const Planet& sun, float deltaTime) {
+
+		update(deltaTime, sun);
+
 		glBindVertexArray(vaoId);
 
 		// Add color uniform
@@ -132,9 +234,9 @@ public:
 
 		// Draw with distance from sun as translation
 		glm::mat4 model = glm::mat4(1.0f);
-		model = glm::translate(model, getPosition());
+		glm::vec3 renderPos = glm::vec3(position);  // ADD THIS: Convert double to float for rendering
+		model = glm::translate(model, renderPos);   // CHANGE: use renderPos instead of position
 		glUniformMatrix4fv(glGetUniformLocation(shader.ID, "model"), 1, GL_FALSE, glm::value_ptr(model));
-
 
 		glDrawElements(GL_TRIANGLES, sphere.getIndexCount(), GL_UNSIGNED_INT, 0);
 		glBindVertexArray(0);

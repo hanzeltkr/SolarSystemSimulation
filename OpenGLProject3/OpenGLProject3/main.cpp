@@ -96,6 +96,7 @@ int main() {
 
 
 
+	lastFrame = glfwGetTime();  // Initialize lastFrame before loop starts
 	// Render loop
 	while (!glfwWindowShouldClose(window)) {
 
@@ -120,7 +121,8 @@ int main() {
 		// View matrix - update with camera position and orientation
 		glm::mat4 view = glm::lookAt(camera.cameraPos, camera.cameraPos + camera.cameraFront, camera.cameraUp);
 		// Projection matrix - update with fov from scroll
-		glm::mat4 projection = glm::perspective(glm::radians(camera.fov), 800.0f / 600.0f, 0.1f, 100.0f);
+		//g;m::perspective(FOV, aspect ratio, near plane, far plane)
+		glm::mat4 projection = glm::perspective(glm::radians(camera.fov), 800.0f / 600.0f, 0.1f, 1000.0f);
 
 		// Upload matrices to shader
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
@@ -128,15 +130,25 @@ int main() {
 		glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
 
-		sun.draw(ourShader);
-		mercury.draw(ourShader);
-		venus.draw(ourShader);
-		earth.draw(ourShader);
-		mars.draw(ourShader);
-		jupiter.draw(ourShader);
-		saturn.draw(ourShader);
-		uranus.draw(ourShader);
-		neptune.draw(ourShader);
+		sun.draw(ourShader, sun, deltaTime);
+		mercury.draw(ourShader, sun, deltaTime);
+		venus.draw(ourShader, sun, deltaTime);
+
+		earth.draw(ourShader, sun, deltaTime);
+
+		static int frameCount = 0;
+		if (frameCount++ % 60 == 0) {  // Print every 60 frames
+			glm::vec3 pos = earth.getPosition();
+			std::cout << "Earth: (" << pos.x << ", " << pos.y << ", " << pos.z << ")" << std::endl;
+		}
+
+		mars.draw(ourShader, sun, deltaTime);
+		jupiter.draw(ourShader, sun, deltaTime);
+		saturn.draw(ourShader, sun, deltaTime);
+		uranus.draw(ourShader, sun, deltaTime);
+		neptune.draw(ourShader, sun, deltaTime);
+
+
 
 
 		
