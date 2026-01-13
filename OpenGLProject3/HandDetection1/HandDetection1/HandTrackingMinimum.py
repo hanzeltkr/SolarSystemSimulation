@@ -1,0 +1,69 @@
+import cv2
+import mediapipe as mp
+import time
+
+# Use webcam 0
+cap = cv2.VideoCapture(0)
+
+
+# Create hand landmarker object
+base_options = mp.tasks.BaseOptions(model_asset_path='hand_landmarker.task')
+options = mp.tasks.vision.HandLandmarkerOptions(
+    base_options=base_options,
+    running_mode=mp.tasks.vision.RunningMode.VIDEO
+)
+mpHands = mp.tasks.vision.HandLandmarker.create_from_options(options)
+
+# For getting hand connections
+HAND_CONNECTIONS = mp.tasks.vision.HandLandmarksConnections.HAND_CONNECTIONS
+
+# Set up for showing fps
+pTime = 0
+cTime = 0
+
+
+while True:
+    success, img = cap.read()
+    imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    
+    # Convert to image
+    mp_image = mp.Image(mp.ImageFormat.SRGB, imgRGB)
+    # Get image dimension
+    h, w, c = img.shape
+
+    timestamp_ms = int(time.time() * 1000)
+
+    result = mpHands.detect_for_video(mp_image, timestamp_ms)
+    # If detect hand
+    if (result.hand_landmarks) :
+        # For each hand
+        for handLms in result.hand_landmarks :
+            # For each landmark
+            for id, lm in enumerate(handLms) :
+                # Convert normalized coordinates to pixel coordinates
+                cx, cy = int(lm.x * w), int(lm.y * h)
+                cv2.circle(img, (cx, cy), 5, (255, 0, 255), cv2.FILLED)
+                cv2.putText(img, str(id), (cx + 10, cy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 255), 2)
+
+            # Draw connections between landmarks
+            for connections in HAND_CONNECTIONS :
+                # For each connection get the first and second node
+                start_lm = handLms[connections.start]
+                end_lm = handLms[connections.end]
+
+                # Convert normalized coordinates to pixel coordinates
+                start_point = (int(start_lm.x * w), int(start_lm.y * h))
+                end_point = (int(end_lm.x * w), int(end_lm.y * h))
+
+                cv2.line(img, start_point, end_point, (0, 255, 0), 2)
+
+
+
+    # Show fps calculated
+    cTime = time.time()
+    fps = 1/(cTime - pTime)
+    pTime = cTime
+    cv2.putText(img, str(int(fps)), (10, 70), cv2.FONT_HERSHEY_COMPLEX, 2, (255, 8, 255), 3)
+
+    cv2.imshow("Image", img)
+    cv2.waitKey(1)
