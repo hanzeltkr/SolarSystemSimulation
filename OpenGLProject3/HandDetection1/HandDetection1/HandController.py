@@ -3,6 +3,8 @@ import mediapipe as mp
 import time
 import numpy as np
 import math
+import sys
+import os
 
 # Use webcam 0
 cap = cv2.VideoCapture(0)
@@ -12,8 +14,11 @@ cap.set(3, wCam)
 cap.set(4, hCam)
 
 
-# Create hand landmarker object
-base_options = mp.tasks.BaseOptions(model_asset_path='hand_landmarker.task')
+# Get the directory where this script is located
+script_dir = os.path.dirname(os.path.abspath(__file__))
+model_path = os.path.join(script_dir, 'hand_landmarker.task')
+
+base_options = mp.tasks.BaseOptions(model_asset_path=model_path)
 options = mp.tasks.vision.HandLandmarkerOptions(
     base_options=base_options,
     running_mode=mp.tasks.vision.RunningMode.VIDEO,
@@ -33,6 +38,22 @@ cTime = 0
 press = False
 start_press = None
 hold_printed = False
+
+
+METHOD_CODES = {
+    "position": 1,
+    "startHold": 2,
+    "holding": 3,
+    "endHold": 4,
+    "click": 5
+}
+
+
+def send_output(output_type, x, y):
+    code = METHOD_CODES[output_type]
+    output = f"{code} {x} {y}"
+    print(output)
+    sys.stdout.flush()
 
 while True:
     success, img = cap.read()
@@ -91,21 +112,27 @@ while True:
                 if press == False :
                     press = True
                     start_press = time.time()
-                    hold_printed = False
+                elif hold_printed == True :
+                    send_output("holding", cx, cy)
                 else :
-                    # Check if held for more than 2 seconds
-                    if not hold_printed and (time.time() - start_press >= 0.5) :
-                        print("hold")
+                    # Check if held for more than 0.3 seconds
+                    if not hold_printed and (time.time() - start_press >= 0.3) :
+                        send_output("startHold", cx, cy)
                         hold_printed = True
             else :
                 if press == True :
                     end_press = time.time()
                     duration = end_press - start_press
-                    if duration < 0.5 :
-                        print(f"click (duration: {duration:.2f}s, length: {length:.2f})")
+                    if duration < 0.3 :
+                        send_output("click", cx, cy)
                     press = False
                     start_press = None
+                elif hold_printed == True :
+                    send_output("endHold", cx, cy)
                     hold_printed = False
+                else :
+                    send_output("position", cx, cy)
+
                 
             cv2.putText(img, str(length), (cx, cy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 8, 255), 2)
 

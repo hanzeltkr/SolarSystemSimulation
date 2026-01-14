@@ -9,6 +9,37 @@
 #include <Camera.h>
 #include <Planets.h>
 
+#include <thread>
+#include <atomic>
+#include <cstdio>
+
+// For reading hand control data
+std::atomic<int> inputTypeCode(0); // Store input types as integer code
+std::atomic<int> handX(0);
+std::atomic<int> handY(0);
+std::atomic<bool> handDataReady(false);
+void readHandData() {
+	FILE* pipe = _popen("python C:\\Users\\namfa\\OneDrive\\Desktop\\Coding\\OpenGL01\\OpenGLProject3\\HandDetection1\\HandDetection1\\HandController.py", "r");
+
+	if (!pipe) {
+		std::cerr << "Failed to start Python script!" << std::endl;
+		return;
+	}
+
+	char buffer[256];
+	while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+		int code, x, y;
+		if (sscanf_s(buffer, "%d %d %d", &code, &x, &y) == 3) {
+			inputTypeCode.store(code);
+			handX.store(x);
+			handY.store(y);
+			handDataReady.store(true);
+		}
+	}
+	_pclose(pipe);
+}
+
+
 // Register callback function to adjust viewport on window resize
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 	glViewport(0, 0, width, height);
@@ -66,7 +97,7 @@ int main() {
 
 
 	// Hide cursor
-	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 	
 	
@@ -94,6 +125,9 @@ int main() {
 	allPlanets.push_back(&neptune);
 	
 
+	// Start python thread
+	std::thread handThread(readHandData);
+	handThread.detach();
 
 
 	Shader ourShader("vertex.vert", "fragment.frag");
@@ -117,6 +151,26 @@ int main() {
 		float currentFrame = glfwGetTime();
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
+
+
+		if (handDataReady.load()) {
+			int method = inputTypeCode.load();
+			int x = handX.load();
+			int y = handY.load();
+
+			const char* methodName = "unknown";
+			if (method == 1) methodName = "position";
+			else if (method == 2) methodName = "startHold";
+			else if (method == 3) methodName = "holding";
+			else if (method == 4) methodName = "endHold";
+			else if (method == 5) methodName = "clicking";
+
+			// For debugging
+			std::cout << "Hand: " << methodName << ", " << x << ", " << y << ", " << std::endl;
+		
+			handDataReady.store(false);
+		}
+
 
 		// Input
 		camera.processInput(window, deltaTime);
@@ -144,10 +198,10 @@ int main() {
 
 
 		static int frameCount = 0;
-		if (frameCount++ % 60 == 0) {  // Print every 60 frames
+		/*if (frameCount++ % 60 == 0) {  // Print every 60 frames
 			glm::vec3 pos = earth.getPosition();
 			std::cout << "Earth: (" << pos.x << ", " << pos.y << ", " << pos.z << ")" << std::endl;
-		}
+		}*/
 
 		for (Planet* planet : allPlanets) {
 			planet->draw(ourShader, allPlanets, deltaTime);

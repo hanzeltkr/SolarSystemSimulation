@@ -27,7 +27,7 @@ private:
 	glm::dvec3 position = glm::dvec3(0.0);
 
 	const double G = 6.67430e-11;
-	const double TIME_SCALE = 1000000000.0;  // Much faster - was 100.0
+	const double TIME_SCALE = 10000000.0;  // Much faster - was 100.0
 
 	float lastUpdateTime = 0.0f;
 
