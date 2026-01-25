@@ -49,9 +49,9 @@ METHOD_CODES = {
 }
 
 
-def send_output(output_type, x, y):
+def send_output(output_type, x, y, length):
     code = METHOD_CODES[output_type]
-    output = f"{code} {x} {y}"
+    output = f"{code} {x} {y} {length:.2f}"
     print(output)
     sys.stdout.flush()
 
@@ -113,25 +113,25 @@ while True:
                     press = True
                     start_press = time.time()
                 elif hold_printed == True :
-                    send_output("holding", cx, cy)
+                    send_output("holding", cx, cy, length)
                 else :
                     # Check if held for more than 0.3 seconds
                     if not hold_printed and (time.time() - start_press >= 0.3) :
-                        send_output("startHold", cx, cy)
+                        send_output("startHold", cx, cy, length)
                         hold_printed = True
             else :
                 if press == True :
                     end_press = time.time()
                     duration = end_press - start_press
                     if duration < 0.3 :
-                        send_output("click", cx, cy)
+                        send_output("click", cx, cy, length)
                     press = False
                     start_press = None
                 elif hold_printed == True :
-                    send_output("endHold", cx, cy)
+                    send_output("endHold", cx, cy, length)
                     hold_printed = False
                 else :
-                    send_output("position", cx, cy)
+                    send_output("position", cx, cy, length)
 
                 
             cv2.putText(img, str(length), (cx, cy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 8, 255), 2)

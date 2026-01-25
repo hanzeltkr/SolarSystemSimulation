@@ -13,6 +13,8 @@ public:
 	glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
 	glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 
+	int method = 0;
+
 	// Mouse position
 	float lastX = 400.0f, lastY = 300.0f;
 	float yaw = -90.0f;
@@ -45,6 +47,48 @@ public:
 	}
 
 	void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
+
+		// Makes the camera not jump when the window receives mouse cursor
+		if (firstMouse)
+		{
+			lastX = xpos;
+			lastY = ypos;
+			firstMouse = false;
+		}
+		// Only update camera if left mouse button is pressed
+		if (!leftMousePressed)
+			return;
+
+		// Calculate offset movement between last and current frame
+		float xoffset = xpos - lastX;
+		float yoffset = lastY - ypos; // reversed since y-coordinates range from bottom to top
+		lastX = xpos;
+		lastY = ypos;
+
+		xoffset *= mouseSensitivity;  // Change from const float sensitivity = 0.1f;
+		yoffset *= mouseSensitivity;
+
+		// Add offset values to pitch and yaw
+		yaw += xoffset;
+		pitch += yoffset;
+
+		// Makes LookAt not flip if look higher than 90 degrees
+		if (pitch > 89.0f)
+			pitch = 89.0f;
+		if (pitch < -89.0f)
+			pitch = -89.0f;
+
+		// Calculate actual direction vector
+		glm::vec3 direction;
+		direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+		direction.y = sin(glm::radians(pitch));
+		direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+		cameraFront = glm::normalize(direction);
+
+
+	}
+
+	void hand_callback(GLFWwindow* window, int xpos, int ypos) {
 
 		// Makes the camera not jump when the window receives mouse cursor
 		if (firstMouse)

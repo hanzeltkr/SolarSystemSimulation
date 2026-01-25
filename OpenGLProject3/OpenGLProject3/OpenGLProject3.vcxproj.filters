@@ -28,6 +28,8 @@
   <ItemGroup>
     <None Include="vertex.vert" />
     <None Include="fragment.frag" />
+    <None Include="vertCir.vert" />
+    <None Include="fragCir.frag" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="header\Sphere.h">
@@ -43,6 +45,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="header\Trail.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="header\HandCursor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

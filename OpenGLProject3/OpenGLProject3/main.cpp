@@ -8,36 +8,10 @@
 #include <Shader.h>
 #include <Camera.h>
 #include <Planets.h>
+#include <HandCursor.h>
 
-#include <thread>
-#include <atomic>
-#include <cstdio>
 
-// For reading hand control data
-std::atomic<int> inputTypeCode(0); // Store input types as integer code
-std::atomic<int> handX(0);
-std::atomic<int> handY(0);
-std::atomic<bool> handDataReady(false);
-void readHandData() {
-	FILE* pipe = _popen("python C:\\Users\\namfa\\OneDrive\\Desktop\\Coding\\OpenGL01\\OpenGLProject3\\HandDetection1\\HandDetection1\\HandController.py", "r");
-
-	if (!pipe) {
-		std::cerr << "Failed to start Python script!" << std::endl;
-		return;
-	}
-
-	char buffer[256];
-	while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
-		int code, x, y;
-		if (sscanf_s(buffer, "%d %d %d", &code, &x, &y) == 3) {
-			inputTypeCode.store(code);
-			handX.store(x);
-			handY.store(y);
-			handDataReady.store(true);
-		}
-	}
-	_pclose(pipe);
-}
+// Read python output
 
 
 // Register callback function to adjust viewport on window resize
@@ -59,7 +33,7 @@ int main() {
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
 	// Create a GLFW window
-	GLFWwindow* window = glfwCreateWindow(800, 600, "LearnOpenGL", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(1280, 720, "LearnOpenGL", NULL, NULL);
 	if (window == NULL) {
 		std::cout << "Failed to create GLFW window" << std::endl;
 		glfwTerminate();
@@ -74,7 +48,7 @@ int main() {
 	}
 
 	// Viewport
-	glViewport(0, 0, 800, 600);
+	glViewport(0, 0, 1280, 720);
 
 	// Create camera
 	Camera camera;
@@ -125,12 +99,10 @@ int main() {
 	allPlanets.push_back(&neptune);
 	
 
-	// Start python thread
-	std::thread handThread(readHandData);
-	handThread.detach();
 
-
+	
 	Shader ourShader("vertex.vert", "fragment.frag");
+	Shader circleShader("vertCir.vert", "fragCir.frag");
 	
 	// Get uniform locations
 	int modelLoc = glGetUniformLocation(ourShader.ID, "model");
@@ -140,6 +112,10 @@ int main() {
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+
+
+	HandCursor handCursor(&circleShader, 1280.0f, 720.0f);
 
 
 
@@ -153,23 +129,7 @@ int main() {
 		lastFrame = currentFrame;
 
 
-		if (handDataReady.load()) {
-			int method = inputTypeCode.load();
-			int x = handX.load();
-			int y = handY.load();
-
-			const char* methodName = "unknown";
-			if (method == 1) methodName = "position";
-			else if (method == 2) methodName = "startHold";
-			else if (method == 3) methodName = "holding";
-			else if (method == 4) methodName = "endHold";
-			else if (method == 5) methodName = "clicking";
-
-			// For debugging
-			std::cout << "Hand: " << methodName << ", " << x << ", " << y << ", " << std::endl;
 		
-			handDataReady.store(false);
-		}
 
 
 		// Input
@@ -189,7 +149,7 @@ int main() {
 		glm::mat4 view = glm::lookAt(camera.cameraPos, camera.cameraPos + camera.cameraFront, camera.cameraUp);
 		// Projection matrix - update with fov from scroll
 		//g;m::perspective(FOV, aspect ratio, near plane, far plane)
-		glm::mat4 projection = glm::perspective(glm::radians(camera.fov), 800.0f / 600.0f, 0.1f, 1000.0f);
+		glm::mat4 projection = glm::perspective(glm::radians(camera.fov), 1280.0f / 720.0f, 0.1f, 1000.0f);
 
 		// Upload matrices to shader
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
@@ -208,8 +168,21 @@ int main() {
 		}
 
 
+		// For drawing overlay on camera view
+		// Disable depth test
+		glDisable(GL_DEPTH_TEST);
 
+		circleShader.use();
+
+		// Draw circle
 		
+		handCursor.updatePosition();
+		handCursor.processInput(window, deltaTime, &camera);
+
+		// Re-enable depth test
+		glEnable(GL_DEPTH_TEST);
+
+
 		// ...
 
 		// Check for any events and swap the buffers
@@ -217,7 +190,7 @@ int main() {
 		glfwPollEvents();		
 	}
 
-	// Cleanup
+	
 	
 
 	glfwTerminate();

@@ -137,11 +137,14 @@
     <ClCompile Include="Sphere.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="fragCir.frag" />
     <None Include="fragment.frag" />
+    <None Include="vertCir.vert" />
     <None Include="vertex.vert" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="header\Camera.h" />
+    <ClInclude Include="header\HandCursor.h" />
     <ClInclude Include="header\Planets.h" />
     <ClInclude Include="header\Shader.h" />
     <ClInclude Include="header\Sphere.h" />
